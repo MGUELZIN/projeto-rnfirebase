@@ -16,6 +16,7 @@ import { styles } from '../styles/dashboard_style';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../services/firebase_service';
 import { UserModal } from '../../UserModal';
+import { fetchCNPJData } from '../api/cnpj_api';
 
 export default function DashboardScreen({ navigation }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -56,18 +57,30 @@ export default function DashboardScreen({ navigation }) {
         const querySnapshot = await getDocs(collection(db, 'usuarios'));
         const usersData = [];
         
-        querySnapshot.forEach((doc, index) => {
+        for (const doc of querySnapshot.docs) {
           const user = doc.data();
+          let razaoSocial = 'Não informado';
+
+          if (user.cnpj) {
+            try {
+              const cnpjData = await fetchCNPJData(user.cnpj);
+              razaoSocial = cnpjData.razao_social || 'Não informado';
+            } catch (error) {
+              console.error(`Erro ao buscar CNPJ ${user.cnpj}:`, error);
+              razaoSocial = 'Erro ao buscar';
+            }
+          }
+
           usersData.push({
             id: doc.id,
-            razaoSocial: user.razaoSocial || 'Não informado',
+            razaoSocial: razaoSocial,
             cnpj: user.cnpj || 'Não informado',
             email: user.email || 'Não informado',
             licenses: user.licenses || 0,
             inicio: user.inicio && user.inicio.toDate ? user.inicio.toDate().toLocaleDateString() : 'Não informado',
             terminate: user.terminate && user.terminate.toDate ? user.terminate.toDate().toLocaleDateString() : 'Não informado'
           });
-        });
+        }
         
         setRows(usersData);
         setLoading(false);
