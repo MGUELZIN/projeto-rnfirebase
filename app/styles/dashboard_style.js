@@ -1,10 +1,11 @@
 import { Button, StyleSheet } from "react-native";
 
 export const styles = StyleSheet.create({
-  pesquisar: {
-    width: '80%',
-    padding: '10px',
-    marginBottom: '20px',
+  title:{
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    textAlign: 'center',
   },
   button: {
     padding: '10px',

@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { 
-  FaBars, 
-  FaTimes, 
-  FaHome, 
-  FaUser, 
-  FaCog, 
+import {
+  FaBars,
+  FaTimes,
+  FaHome,
+  FaUser,
+  FaCog,
   FaSignOutAlt,
   FaPlus
 } from 'react-icons/fa';
@@ -33,9 +33,9 @@ export default function DashboardScreen({ navigation }) {
     return (
       <Container>
         {sidebarOpen ? (
-          <FaTimes onClick={toggleSidebar} color='black'/>
+          <FaTimes onClick={toggleSidebar} color='black' />
         ) : (
-          <FaBars onClick={toggleSidebar} color='black'/>
+          <FaBars onClick={toggleSidebar} color='black' />
         )}
       </Container>
     );
@@ -56,7 +56,7 @@ export default function DashboardScreen({ navigation }) {
       try {
         const querySnapshot = await getDocs(collection(db, 'usuarios'));
         const usersData = [];
-        
+
         for (const doc of querySnapshot.docs) {
           const user = doc.data();
           let razaoSocial = 'Não informado';
@@ -81,7 +81,7 @@ export default function DashboardScreen({ navigation }) {
             terminate: user.terminate && user.terminate.toDate ? user.terminate.toDate().toLocaleDateString() : 'Não informado'
           });
         }
-        
+
         setRows(usersData);
         setLoading(false);
       } catch (error) {
@@ -93,7 +93,7 @@ export default function DashboardScreen({ navigation }) {
     fetchUsers();
   }, [modalVisible]);
 
-  const filteredRows = rows.filter(row => 
+  const filteredRows = rows.filter(row =>
     row.razaoSocial.toLowerCase().includes(searchTerm.toLowerCase()) ||
     row.cnpj.includes(searchTerm) ||
     row.email.toLowerCase().includes(searchTerm.toLowerCase())
@@ -117,7 +117,8 @@ export default function DashboardScreen({ navigation }) {
             Configurações
           </li>
           <li>
-            <FaSignOutAlt style={{ marginRight: '10px' }} 
+            <FaSignOutAlt
+              style={{ marginRight: '10px' }}
               onClick={() => {
                 signOut(auth);
                 navigation.replace('Login');
@@ -128,17 +129,14 @@ export default function DashboardScreen({ navigation }) {
         </ul>
       </SidebarContainer>
       <Overlay $isOpen={sidebarOpen} onClick={toggleSidebar} />
-      
+
       <div style={{ padding: '20px', textAlign: 'center' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-          <input 
-            type="text" 
-            placeholder="Pesquisar..." 
-            style={styles.pesquisar}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)} 
-          />
-          <button 
+        <div style={{ marginBottom: '10px' }}>
+          <h1 style={styles.title}>Painel AES</h1>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' }}>
+          <button
             style={styles.button}
             onClick={() => setModalVisible(true)}
           >
@@ -146,16 +144,28 @@ export default function DashboardScreen({ navigation }) {
             Adicionar Usuário
           </button>
         </div>
-        
-        <h1 style={styles.title}>Painel AES</h1>
 
         <div style={{ height: 500, width: '100%', marginTop: '20px' }}>
           {loading ? (
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                height: '100%',
+              }}
+            >
               Carregando dados...
             </div>
           ) : filteredRows.length === 0 ? (
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                height: '100%',
+              }}
+            >
               {searchTerm ? 'Nenhum resultado encontrado' : 'Nenhum usuário cadastrado'}
             </div>
           ) : (
@@ -179,8 +189,8 @@ export default function DashboardScreen({ navigation }) {
         </div>
       </div>
 
-      <UserModal 
-        visible={modalVisible} 
+      <UserModal
+        visible={modalVisible}
         onClose={() => setModalVisible(false)}
       />
     </>
