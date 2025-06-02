@@ -7,14 +7,15 @@ import {
   FaCog,
   FaSignOutAlt,
   FaPlus,
-  FaSync
+  FaSync,
+  FaTrash
 } from 'react-icons/fa';
 import { Container, SidebarContainer, Overlay } from '../styles/sidebar_style';
 import { signOut } from 'firebase/auth';
 import { auth, db } from '../../services/firebase_service';
 import { DataGrid } from '@mui/x-data-grid';
 import { styles } from '../styles/dashboard_style';
-import { collection, onSnapshot, doc, updateDoc, Timestamp } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, deleteDoc, Timestamp } from 'firebase/firestore';
 import { UserModal } from '../../UserModal';
 import { fetchCNPJData } from '../api/cnpj_api';
 
@@ -27,15 +28,19 @@ export default function DashboardScreen({ navigation }) {
 
   const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
 
-  const Header = () => (
-    <Container>
-      {sidebarOpen ? (
-        <FaTimes onClick={toggleSidebar} color='black' />
-      ) : (
-        <FaBars onClick={toggleSidebar} color='black' />
-      )}
-    </Container>
-  );
+  const removerUsuario = async (id, cnpj) => {
+    const confirmar = window.confirm("Tem certeza que deseja remover este usuário?");
+    if (!confirmar) return;
+
+    try {
+      await deleteDoc(doc(db, 'usuarios', id));
+      await deleteDoc(doc(db, cnpj, 'default'));
+      alert("Usuário removido com sucesso!");
+    } catch (error) {
+      console.error('Erro ao remover usuário:', error);
+      alert("Erro ao remover usuário.");
+    }
+  };
 
   const columns = [
     { field: 'id', headerName: 'ID', width: 90 },
@@ -63,10 +68,20 @@ export default function DashboardScreen({ navigation }) {
       valueGetter: (params) => (
         params.value instanceof Date ? params.value : new Date(params.value)
       )
+    },
+    {
+      field: 'acoes',
+      headerName: 'Ações',
+      width: 100,
+      renderCell: (params) => (
+        <FaTrash
+          style={{ cursor: 'pointer', color: 'red' }}
+          onClick={() => removerUsuario(params.row.id, params.row.cnpj)}
+        />
+      )
     }
   ];
 
-  // Atualização automática com onSnapshot
   useEffect(() => {
     setLoading(true);
     const unsubscribe = onSnapshot(collection(db, 'usuarios'), async (querySnapshot) => {
@@ -128,7 +143,14 @@ export default function DashboardScreen({ navigation }) {
 
   return (
     <>
-      <Header />
+      <Container>
+        {sidebarOpen ? (
+          <FaTimes onClick={toggleSidebar} color='black' />
+        ) : (
+          <FaBars onClick={toggleSidebar} color='black' />
+        )}
+      </Container>
+
       <SidebarContainer $isOpen={sidebarOpen}>
         <ul>
           <li>
@@ -155,12 +177,11 @@ export default function DashboardScreen({ navigation }) {
           </li>
         </ul>
       </SidebarContainer>
+
       <Overlay $isOpen={sidebarOpen} onClick={toggleSidebar} />
 
       <div style={{ padding: '20px', textAlign: 'center' }}>
-        <div style={{ marginBottom: '10px' }}>
-          <h1 style={styles.title}>Painel AES</h1>
-        </div>
+        <h1 style={styles.title}>Painel AES</h1>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
           <input
@@ -184,11 +205,11 @@ export default function DashboardScreen({ navigation }) {
               <FaPlus style={{ marginRight: '5px' }} />
               Adicionar Usuário
             </button>
+
             <button
               style={styles.button}
               onClick={() => {
                 setLoading(true);
-                // Simula recarregamento, mas na prática `onSnapshot` já cuida.
                 setTimeout(() => setLoading(false), 500);
               }}
             >
@@ -198,7 +219,7 @@ export default function DashboardScreen({ navigation }) {
           </div>
         </div>
 
-        <div style={{ height: 500, width: '100%', marginTop: '20px' }}>
+        <div style={{ height: 500, width: '100%' }}>
           {loading ? (
             <div
               style={{
