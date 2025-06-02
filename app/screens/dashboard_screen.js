@@ -6,15 +6,15 @@ import {
   FaUser,
   FaCog,
   FaSignOutAlt,
-  FaPlus
+  FaPlus,
+  FaSync
 } from 'react-icons/fa';
 import { Container, SidebarContainer, Overlay } from '../styles/sidebar_style';
 import { signOut } from 'firebase/auth';
-import { auth } from '../../services/firebase_service';
+import { auth, db } from '../../services/firebase_service';
 import { DataGrid } from '@mui/x-data-grid';
 import { styles } from '../styles/dashboard_style';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '../../services/firebase_service';
+import { collection, onSnapshot, doc, updateDoc, Timestamp } from 'firebase/firestore';
 import { UserModal } from '../../UserModal';
 import { fetchCNPJData } from '../api/cnpj_api';
 
@@ -25,73 +25,100 @@ export default function DashboardScreen({ navigation }) {
   const [modalVisible, setModalVisible] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const toggleSidebar = () => {
-    setSidebarOpen(!sidebarOpen);
-  };
+  const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
 
-  const Header = () => {
-    return (
-      <Container>
-        {sidebarOpen ? (
-          <FaTimes onClick={toggleSidebar} color='black' />
-        ) : (
-          <FaBars onClick={toggleSidebar} color='black' />
-        )}
-      </Container>
-    );
-  };
+  const Header = () => (
+    <Container>
+      {sidebarOpen ? (
+        <FaTimes onClick={toggleSidebar} color='black' />
+      ) : (
+        <FaBars onClick={toggleSidebar} color='black' />
+      )}
+    </Container>
+  );
 
   const columns = [
     { field: 'id', headerName: 'ID', width: 90 },
     { field: 'razaoSocial', headerName: 'Razão Social', width: 200 },
     { field: 'cnpj', headerName: 'CNPJ', width: 150 },
     { field: 'email', headerName: 'Email', width: 200 },
-    { field: 'licenses', headerName: 'Licenças', width: 120 },
-    { field: 'inicio', headerName: 'Início', width: 150 },
-    { field: 'terminate', headerName: 'Término', width: 150 },
+    {
+      field: 'licenses',
+      headerName: 'Licenças',
+      width: 120,
+      editable: true,
+      type: 'number'
+    },
+    {
+      field: 'inicio',
+      headerName: 'Início',
+      width: 150
+    },
+    {
+      field: 'terminate',
+      headerName: 'Término',
+      width: 200,
+      editable: true,
+      type: 'date',
+      valueGetter: (params) => (
+        params.value instanceof Date ? params.value : new Date(params.value)
+      )
+    }
   ];
 
+  // Atualização automática com onSnapshot
   useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        const querySnapshot = await getDocs(collection(db, 'usuarios'));
-        const usersData = [];
+    setLoading(true);
+    const unsubscribe = onSnapshot(collection(db, 'usuarios'), async (querySnapshot) => {
+      const usersData = [];
 
-        for (const doc of querySnapshot.docs) {
-          const user = doc.data();
-          let razaoSocial = 'Não informado';
+      for (const docSnap of querySnapshot.docs) {
+        const user = docSnap.data();
+        let razaoSocial = 'Não informado';
 
-          if (user.cnpj) {
-            try {
-              const cnpjData = await fetchCNPJData(user.cnpj);
-              razaoSocial = cnpjData.razao_social || 'Não informado';
-            } catch (error) {
-              console.error(`Erro ao buscar CNPJ ${user.cnpj}:`, error);
-              razaoSocial = 'Erro ao buscar';
-            }
+        if (user.cnpj) {
+          try {
+            const cnpjData = await fetchCNPJData(user.cnpj);
+            razaoSocial = cnpjData.razao_social || 'Não informado';
+          } catch (error) {
+            console.error(`Erro ao buscar CNPJ ${user.cnpj}:`, error);
+            razaoSocial = 'Erro ao buscar';
           }
-
-          usersData.push({
-            id: doc.id,
-            razaoSocial: razaoSocial,
-            cnpj: user.cnpj || 'Não informado',
-            email: user.email || 'Não informado',
-            licenses: user.licenses || 0,
-            inicio: user.inicio && user.inicio.toDate ? user.inicio.toDate().toLocaleDateString() : 'Não informado',
-            terminate: user.terminate && user.terminate.toDate ? user.terminate.toDate().toLocaleDateString() : 'Não informado'
-          });
         }
 
-        setRows(usersData);
-        setLoading(false);
-      } catch (error) {
-        console.error("Erro ao buscar usuários:", error);
-        setLoading(false);
+        usersData.push({
+          id: docSnap.id,
+          razaoSocial,
+          cnpj: user.cnpj || 'Não informado',
+          email: user.email || 'Não informado',
+          licenses: user.licenses || 0,
+          inicio: user.inicio && user.inicio.toDate ? user.inicio.toDate().toLocaleDateString() : 'Não informado',
+          terminate: user.terminate && user.terminate.toDate ? user.terminate.toDate() : null
+        });
       }
-    };
 
-    fetchUsers();
-  }, [modalVisible]);
+      setRows(usersData);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const handleRowUpdate = async (newRow, oldRow) => {
+    try {
+      const userRef = doc(db, 'usuarios', newRow.id);
+
+      await updateDoc(userRef, {
+        licenses: Number(newRow.licenses),
+        terminate: Timestamp.fromDate(new Date(newRow.terminate)),
+      });
+
+      return newRow;
+    } catch (error) {
+      console.error('Erro ao atualizar usuário:', error);
+      return oldRow;
+    }
+  };
 
   const filteredRows = rows.filter(row =>
     row.razaoSocial.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -135,14 +162,40 @@ export default function DashboardScreen({ navigation }) {
           <h1 style={styles.title}>Painel AES</h1>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' }}>
-          <button
-            style={styles.button}
-            onClick={() => setModalVisible(true)}
-          >
-            <FaPlus style={{ marginRight: '5px' }} />
-            Adicionar Usuário
-          </button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
+          <input
+            type="text"
+            placeholder="Buscar..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{
+              padding: '8px',
+              borderRadius: '4px',
+              border: '1px solid #ccc',
+              width: '200px'
+            }}
+          />
+
+          <div>
+            <button
+              style={{ ...styles.button, marginRight: '10px' }}
+              onClick={() => setModalVisible(true)}
+            >
+              <FaPlus style={{ marginRight: '5px' }} />
+              Adicionar Usuário
+            </button>
+            <button
+              style={styles.button}
+              onClick={() => {
+                setLoading(true);
+                // Simula recarregamento, mas na prática `onSnapshot` já cuida.
+                setTimeout(() => setLoading(false), 500);
+              }}
+            >
+              <FaSync style={{ marginRight: '5px' }} />
+              Atualizar
+            </button>
+          </div>
         </div>
 
         <div style={{ height: 500, width: '100%', marginTop: '20px' }}>
@@ -175,6 +228,8 @@ export default function DashboardScreen({ navigation }) {
               pageSize={5}
               rowsPerPageOptions={[5, 10, 20]}
               checkboxSelection
+              processRowUpdate={handleRowUpdate}
+              experimentalFeatures={{ newEditingApi: true }}
               localeText={{
                 noRowsLabel: 'Nenhum registro encontrado',
                 footerRowSelected: count => `${count.toLocaleString()} linha(s) selecionada(s)`,
